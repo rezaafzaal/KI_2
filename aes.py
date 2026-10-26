@@ -119,6 +119,56 @@ def encrypt_block(block: bytes, w: list) -> bytes:
     return state_to_bytes(state)
 
 
+def gmul(a: int, b: int) -> int:
+    """perkalian a * b di GF(2^8) lewat xtime berulang"""
+    p = 0
+    while b:
+        if b & 1:
+            p ^= a
+        a = xtime(a)
+        b >>= 1
+    return p
+
+
+def inv_shift_rows(state: list) -> list:
+    """baris ke-r digeser ke kanan sebanyak r"""
+    return [state[r][4 - r:] + state[r][:4 - r] for r in range(4)]
+
+
+def inv_sub_bytes(state: list) -> list:
+    return [[INV_SBOX[b] for b in row] for row in state]
+
+
+def inv_mix_single_column(col: list) -> list:
+    """kolom dikali matriks [0e 0b 0d 09] yang digeser per baris"""
+    a0, a1, a2, a3 = col
+    return [
+        gmul(a0, 0x0e) ^ gmul(a1, 0x0b) ^ gmul(a2, 0x0d) ^ gmul(a3, 0x09),
+        gmul(a0, 0x09) ^ gmul(a1, 0x0e) ^ gmul(a2, 0x0b) ^ gmul(a3, 0x0d),
+        gmul(a0, 0x0d) ^ gmul(a1, 0x09) ^ gmul(a2, 0x0e) ^ gmul(a3, 0x0b),
+        gmul(a0, 0x0b) ^ gmul(a1, 0x0d) ^ gmul(a2, 0x09) ^ gmul(a3, 0x0e),
+    ]
+
+
+def inv_mix_columns(state: list) -> list:
+    cols = [inv_mix_single_column([state[r][c] for r in range(4)]) for c in range(4)]
+    return [[cols[c][r] for c in range(4)] for r in range(4)]
+
+
+def decrypt_block(block: bytes, w: list) -> bytes:
+    """dekripsi 1 blok 16 byte, w = hasil key_expansion"""
+    state = add_round_key(bytes_to_state(block), w, 10)
+    for rnd in range(9, 0, -1):
+        state = inv_shift_rows(state)
+        state = inv_sub_bytes(state)
+        state = add_round_key(state, w, rnd)
+        state = inv_mix_columns(state)
+    state = inv_shift_rows(state)
+    state = inv_sub_bytes(state)
+    state = add_round_key(state, w, 0)
+    return state_to_bytes(state)
+
+
 def encrypt(plaintext: str, key: str) -> str:
     """plaintext ASCII + key ASCII 16 karakter -> ciphertext hex"""
     return plaintext.encode().hex()  # TODO: ganti dengan AES asli
