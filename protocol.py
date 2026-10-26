@@ -47,3 +47,20 @@ def load_config():
 def log(who, msg):
     """Format log seragam supaya alur langkah 1-5 mudah diikuti saat demo."""
     print(f"[{who}] {msg}")
+    
+
+
+def ask(prompt, default=None):
+    """input() dengan nilai default kalau user langsung Enter."""
+    suffix = f" [{default}]" if default is not None else ""
+    val = input(f"{prompt}{suffix}: ").strip()
+    return val if val else default
+
+
+def ask_key(prompt):
+    """Minta key sampai valid: tepat 16 karakter ASCII."""
+    while True:
+        key = input(f"{prompt} ({KEY_LEN} karakter ASCII): ")
+        if len(key) == KEY_LEN and key.isascii():
+            return key
+        print(f"  key harus tepat {KEY_LEN} karakter ASCII, sekarang {len(key)} karakter")
