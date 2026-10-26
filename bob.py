@@ -3,6 +3,7 @@ import json
 import socket
 
 import aes
+import chat
 import protocol as p
 from net import send_msg, recv_msg
 
@@ -47,13 +48,25 @@ def handle_handshake(conn, kb):
     p.log("BOB", f"(5) f(N2)={nilai} cocok -> Handshake OK dengan {id_a}")
     return ks, id_a
 
-
 def main():
     cfg = p.load_config()
     id_b = p.ask("ID Bob", "bob")
-    kb = p.ask_key("Master key Kb")
+    state = {"kb": p.ask_key("Master key Kb")}   # dict supaya bisa diganti lewat /master
     host = p.ask("Host bind", "0.0.0.0")
     port = int(p.ask("Port", cfg["bob_port"]))
+
+    def on_rekey(msg):
+        """Alice mengirim tiket baru E(Kb,[Ks'||ID_A]); buka dengan Kb."""
+        try:
+            tiket = json.loads(aes.decrypt(msg["ticket"], state["kb"]))
+            p.log("BOB", f"rekey: tiket baru dari {tiket['id_a']}, Ks = {tiket['ks']}")
+            return tiket["ks"]
+        except (ValueError, KeyError):
+            p.log("BOB", "rekey gagal: tiket tidak bisa dibuka - Kb salah?")
+            return None
+
+    def set_master(key):
+        state["kb"] = key
 
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -66,11 +79,16 @@ def main():
             conn, addr = srv.accept()
             p.log("BOB", f"koneksi dari {addr[0]}")
             try:
-                handle_handshake(conn, kb)
+                hasil = handle_handshake(conn, state["kb"])
+                if hasil:
+                    ks, id_a = hasil
+                    chat.chat_loop(conn, ks, id_b, id_a,
+                                   on_rekey=on_rekey, set_master=set_master)
+                    p.log("BOB", "chat selesai, menunggu koneksi berikutnya")
             except (ConnectionError, ValueError) as e:
                 p.log("BOB", f"error: {e}")
             finally:
-                conn.close()   # chat ditambahkan di branch feature/chat-cli
+                conn.close()
     except KeyboardInterrupt:
         pass
     finally:
