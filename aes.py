@@ -162,6 +162,22 @@ def decrypt_block(block: bytes, w: list) -> bytes:
     return state_to_bytes(state)
 
 
+def pad(data: bytes) -> bytes:
+    # kalau pas kelipatan 16 tetap ditambah 1 blok penuh
+    n = 16 - len(data) % 16
+    return data + bytes([n] * n)
+
+
+def unpad(data: bytes) -> bytes:
+    # key salah biasanya ketahuan di sini
+    if not data or len(data) % 16 != 0:
+        raise ValueError("panjang data tidak valid")
+    n = data[-1]
+    if n < 1 or n > 16 or data[-n:] != bytes([n] * n):
+        raise ValueError("padding tidak valid")
+    return data[:-n]
+
+
 def encrypt(plaintext: str, key: str) -> str:
     """plaintext ASCII + key ASCII 16 karakter -> ciphertext hex"""
     return plaintext.encode().hex()  # TODO: ganti dengan AES asli
