@@ -99,6 +99,26 @@ def mix_columns(state: list) -> list:
     return [[cols[c][r] for c in range(4)] for r in range(4)]
 
 
+def add_round_key(state: list, w: list, rnd: int) -> list:
+    """XOR state dengan round key ke-rnd (word w[4*rnd + c] = kolom c)"""
+    return [[state[r][c] ^ ((w[4 * rnd + c] >> (24 - 8 * r)) & 0xff)
+             for c in range(4)] for r in range(4)]
+
+
+def encrypt_block(block: bytes, w: list) -> bytes:
+    """enkripsi 1 blok 16 byte, w = hasil key_expansion"""
+    state = add_round_key(bytes_to_state(block), w, 0)
+    for rnd in range(1, 10):
+        state = sub_bytes(state)
+        state = shift_rows(state)
+        state = mix_columns(state)
+        state = add_round_key(state, w, rnd)
+    state = sub_bytes(state)
+    state = shift_rows(state)
+    state = add_round_key(state, w, 10)
+    return state_to_bytes(state)
+
+
 def encrypt(plaintext: str, key: str) -> str:
     """plaintext ASCII + key ASCII 16 karakter -> ciphertext hex"""
     return plaintext.encode().hex()  # TODO: ganti dengan AES asli
