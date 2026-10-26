@@ -3,6 +3,7 @@ import json
 import socket
 
 import aes
+import chat
 import protocol as p
 from net import send_msg, recv_msg
 
@@ -68,15 +69,26 @@ def main():
     bob_addr = (p.ask("IP Bob", cfg["bob_host"]),
                 int(p.ask("Port Bob", cfg["bob_port"])))
 
+    state = {"ka": ka}   # disimpan di dict supaya bisa diganti lewat /master
+
     try:
-        ks, ticket = get_session_key(kdc_addr, id_a, id_b, ka)
+        ks, ticket = get_session_key(kdc_addr, id_a, id_b, state["ka"])
         sock = handshake_with_bob(bob_addr, ks, ticket)
     except (RuntimeError, ValueError, OSError) as e:
         p.log("ALICE", f"GAGAL: {e}")
         return
 
-    p.log("ALICE", "handshake selesai, Ks siap dipakai untuk chat")
-    sock.close()   # chat ditambahkan di branch feature/chat-cli
+    p.log("ALICE", "handshake selesai, masuk mode chat")
+
+    def rekey():
+        # ulangi langkah 1-2 ke KDC untuk mendapat Ks baru + tiket baru
+        return get_session_key(kdc_addr, id_a, id_b, state["ka"])
+
+    def set_master(key):
+        state["ka"] = key
+
+    chat.chat_loop(sock, ks, id_a, id_b, rekey=rekey, set_master=set_master)
+    p.log("ALICE", "chat selesai")
 
 
 if __name__ == "__main__":
