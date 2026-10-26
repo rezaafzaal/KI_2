@@ -2,6 +2,8 @@
 # Isi fungsi ini akan diganti AES-128 asli oleh Reza di branch feature/aes-mode.
 # Nama fungsi dan parameternya JANGAN diubah.
 
+import os
+
 
 # tabel s-box
 SBOX = [
@@ -176,6 +178,38 @@ def unpad(data: bytes) -> bytes:
     if n < 1 or n > 16 or data[-n:] != bytes([n] * n):
         raise ValueError("padding tidak valid")
     return data[:-n]
+
+
+def xor_bytes(a: bytes, b: bytes) -> bytes:
+    return bytes(x ^ y for x, y in zip(a, b))
+
+
+def cbc_encrypt(data: bytes, key: bytes, iv: bytes = None) -> bytes:
+    # hasil = IV || ciphertext, iv cuma diisi manual buat test
+    if iv is None:
+        iv = os.urandom(16)
+    w = key_expansion(key)
+    data = pad(data)
+    out = [iv]
+    prev = iv
+    for i in range(0, len(data), 16):
+        prev = encrypt_block(xor_bytes(data[i:i + 16], prev), w)
+        out.append(prev)
+    return b"".join(out)
+
+
+def cbc_decrypt(data: bytes, key: bytes) -> bytes:
+    # minimal IV + 1 blok
+    if len(data) < 32 or len(data) % 16 != 0:
+        raise ValueError("panjang ciphertext tidak valid")
+    w = key_expansion(key)
+    prev = data[:16]
+    out = []
+    for i in range(16, len(data), 16):
+        block = data[i:i + 16]
+        out.append(xor_bytes(decrypt_block(block, w), prev))
+        prev = block
+    return unpad(b"".join(out))
 
 
 def encrypt(plaintext: str, key: str) -> str:

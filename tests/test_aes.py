@@ -5,7 +5,8 @@ import unittest
 # biar bisa import aes.py dari root
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from aes import decrypt_block, encrypt_block, key_expansion, pad, unpad
+from aes import (cbc_decrypt, cbc_encrypt, decrypt_block, encrypt_block,
+                 key_expansion, pad, unpad)
 
 # test vector FIPS-197 C.1
 KEY = bytes.fromhex("000102030405060708090a0b0c0d0e0f")
@@ -39,6 +40,39 @@ class TestPadding(unittest.TestCase):
                       b"a" * 14 + b"\x01\x02"]:
             with self.assertRaises(ValueError):
                 unpad(salah)
+
+
+class TestCBC(unittest.TestCase):
+    def test_nist_sp800_38a(self):
+        # NIST SP 800-38A F.2.1, 2 blok pertama
+        key = bytes.fromhex("2b7e151628aed2a6abf7158809cf4f3c")
+        iv = bytes.fromhex("000102030405060708090a0b0c0d0e0f")
+        plain = bytes.fromhex("6bc1bee22e409f96e93d7e117393172a"
+                              "ae2d8a571e03ac9c9eb76fac45af8e51")
+        hasil = cbc_encrypt(plain, key, iv)
+        self.assertEqual(hasil[:16], iv)
+        self.assertEqual(hasil[16:48].hex(), "7649abac8119b246cee98e9b12e9197d"
+                                             "5086cb9b507219ee95db113a917678b2")
+
+    def test_bolak_balik_3_blok(self):
+        key = b"kuncirahasia1234"
+        plain = b"a" * 40
+        self.assertEqual(cbc_decrypt(cbc_encrypt(plain, key), key), plain)
+
+    def test_iv_acak(self):
+        key = b"kuncirahasia1234"
+        self.assertNotEqual(cbc_encrypt(b"halo", key), cbc_encrypt(b"halo", key))
+
+    def test_key_salah(self):
+        c = cbc_encrypt(b"pesan rahasia", b"kuncirahasia1234")
+        gagal = 0
+        for i in range(50):
+            try:
+                if cbc_decrypt(c, b"kuncisalah%06d" % i) != b"pesan rahasia":
+                    gagal += 1
+            except ValueError:
+                gagal += 1
+        self.assertEqual(gagal, 50)
 
 
 if __name__ == "__main__":
