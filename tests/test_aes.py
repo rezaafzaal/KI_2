@@ -5,8 +5,8 @@ import unittest
 # biar bisa import aes.py dari root
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from aes import (cbc_decrypt, cbc_encrypt, decrypt_block, encrypt_block,
-                 key_expansion, pad, unpad)
+from aes import (cbc_decrypt, cbc_encrypt, decrypt, decrypt_block, encrypt,
+                 encrypt_block, key_expansion, pad, unpad)
 
 # test vector FIPS-197 C.1
 KEY = bytes.fromhex("000102030405060708090a0b0c0d0e0f")
@@ -73,6 +73,33 @@ class TestCBC(unittest.TestCase):
             except ValueError:
                 gagal += 1
         self.assertEqual(gagal, 50)
+
+
+class TestAPI(unittest.TestCase):
+    KEY = "kuncirahasia1234"
+
+    def test_bolak_balik(self):
+        for teks in ["", "halo", "a" * 16, "pesan yang lebih panjang dari 3 blok AES ya"]:
+            self.assertEqual(decrypt(encrypt(teks, self.KEY), self.KEY), teks)
+
+    def test_output_hex_dengan_iv(self):
+        c = encrypt("halo", self.KEY)
+        self.assertEqual(len(c), 64)  # 16 byte IV + 1 blok, dalam hex
+        bytes.fromhex(c)
+
+    def test_input_tidak_valid(self):
+        c = encrypt("halo", self.KEY)
+        salah = [
+            lambda: encrypt("halo", "pendek"),
+            lambda: encrypt("halo é", self.KEY),
+            lambda: decrypt(c, "kunciyangsalah12"),
+            lambda: decrypt("bukan hex", self.KEY),
+            lambda: decrypt(c[:-2], self.KEY),
+            lambda: decrypt(c[:32], self.KEY),
+        ]
+        for f in salah:
+            with self.assertRaises(ValueError):
+                f()
 
 
 if __name__ == "__main__":

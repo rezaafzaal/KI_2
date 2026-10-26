@@ -1,8 +1,9 @@
-# aes.py - STUB SEMENTARA
-# Isi fungsi ini akan diganti AES-128 asli oleh Reza di branch feature/aes-mode.
-# Nama fungsi dan parameternya JANGAN diubah.
+# aes.py - AES-128 mode CBC + padding PKCS#7
+# encrypt/decrypt dipakai kdc, alice, bob. Nama fungsi dan parameternya JANGAN diubah.
 
 import os
+
+from utils import ascii_to_bytes, bytes_to_ascii, bytes_to_hex, hex_to_bytes, validate_key
 
 
 # tabel s-box
@@ -213,10 +214,10 @@ def cbc_decrypt(data: bytes, key: bytes) -> bytes:
 
 
 def encrypt(plaintext: str, key: str) -> str:
-    """plaintext ASCII + key ASCII 16 karakter -> ciphertext hex"""
-    return plaintext.encode().hex()  # TODO: ganti dengan AES asli
+    """plaintext ASCII + key ASCII 16 karakter -> ciphertext hex (IV di depan)"""
+    return bytes_to_hex(cbc_encrypt(ascii_to_bytes(plaintext), validate_key(key)))
 
 
 def decrypt(cipher_hex: str, key: str) -> str:
     """ciphertext hex -> plaintext ASCII. Raise ValueError jika gagal."""
-    return bytes.fromhex(cipher_hex).decode()
+    return bytes_to_ascii(cbc_decrypt(hex_to_bytes(cipher_hex), validate_key(key)))
