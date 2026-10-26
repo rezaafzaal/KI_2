@@ -1,6 +1,9 @@
-# aes.py - STUB SEMENTARA
-# Isi fungsi ini akan diganti AES-128 asli oleh Reza di branch feature/aes-mode.
-# Nama fungsi dan parameternya JANGAN diubah.
+# aes.py - AES-128 mode CBC + padding PKCS#7
+# encrypt/decrypt dipakai kdc, alice, bob. Nama fungsi dan parameternya JANGAN diubah.
+
+import os
+
+from utils import ascii_to_bytes, bytes_to_ascii, bytes_to_hex, hex_to_bytes, validate_key
 
 
 # tabel s-box
@@ -162,11 +165,59 @@ def decrypt_block(block: bytes, w: list) -> bytes:
     return state_to_bytes(state)
 
 
+def pad(data: bytes) -> bytes:
+    # kalau pas kelipatan 16 tetap ditambah 1 blok penuh
+    n = 16 - len(data) % 16
+    return data + bytes([n] * n)
+
+
+def unpad(data: bytes) -> bytes:
+    # key salah biasanya ketahuan di sini
+    if not data or len(data) % 16 != 0:
+        raise ValueError("panjang data tidak valid")
+    n = data[-1]
+    if n < 1 or n > 16 or data[-n:] != bytes([n] * n):
+        raise ValueError("padding tidak valid")
+    return data[:-n]
+
+
+def xor_bytes(a: bytes, b: bytes) -> bytes:
+    return bytes(x ^ y for x, y in zip(a, b))
+
+
+def cbc_encrypt(data: bytes, key: bytes, iv: bytes = None) -> bytes:
+    # hasil = IV || ciphertext, iv cuma diisi manual buat test
+    if iv is None:
+        iv = os.urandom(16)
+    w = key_expansion(key)
+    data = pad(data)
+    out = [iv]
+    prev = iv
+    for i in range(0, len(data), 16):
+        prev = encrypt_block(xor_bytes(data[i:i + 16], prev), w)
+        out.append(prev)
+    return b"".join(out)
+
+
+def cbc_decrypt(data: bytes, key: bytes) -> bytes:
+    # minimal IV + 1 blok
+    if len(data) < 32 or len(data) % 16 != 0:
+        raise ValueError("panjang ciphertext tidak valid")
+    w = key_expansion(key)
+    prev = data[:16]
+    out = []
+    for i in range(16, len(data), 16):
+        block = data[i:i + 16]
+        out.append(xor_bytes(decrypt_block(block, w), prev))
+        prev = block
+    return unpad(b"".join(out))
+
+
 def encrypt(plaintext: str, key: str) -> str:
-    """plaintext ASCII + key ASCII 16 karakter -> ciphertext hex"""
-    return plaintext.encode().hex()  # TODO: ganti dengan AES asli
+    """plaintext ASCII + key ASCII 16 karakter -> ciphertext hex (IV di depan)"""
+    return bytes_to_hex(cbc_encrypt(ascii_to_bytes(plaintext), validate_key(key)))
 
 
 def decrypt(cipher_hex: str, key: str) -> str:
     """ciphertext hex -> plaintext ASCII. Raise ValueError jika gagal."""
-    return bytes.fromhex(cipher_hex).decode()
+    return bytes_to_ascii(cbc_decrypt(hex_to_bytes(cipher_hex), validate_key(key)))
