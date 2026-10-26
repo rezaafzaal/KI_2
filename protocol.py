@@ -12,6 +12,8 @@ STEP4 = "STEP4"   # Bob -> Alice : E(Ks, N2)
 STEP5 = "STEP5"   # Alice -> Bob : E(Ks, f(N2))
 CHAT = "CHAT"     # Alice <-> Bob: E(Ks, pesan)
 ERROR = "ERROR"   # pemberitahuan gagal (tanpa data rahasia)
+REKEY = "REKEY"   # Alice -> Bob: tiket baru E(Kb,[Ks'||ID_A]) saat ganti session key
+BYE = "BYE"       # salah satu pihak keluar dari chat
 
 # ---- default jaringan ----
 KDC_PORT = 5000
