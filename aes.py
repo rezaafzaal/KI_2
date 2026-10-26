@@ -3,7 +3,7 @@
 # Nama fungsi dan parameternya JANGAN diubah.
 
 
-# S-box AES (FIPS-197 Figure 7), indeks = byte input
+# tabel s-box
 SBOX = [
     0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
     0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
@@ -23,29 +23,26 @@ SBOX = [
     0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16,
 ]
 
-# Inverse S-box dibangkitkan dari SBOX, bukan diketik manual
+# inverse s-box diambil dari SBOX
 INV_SBOX = [0] * 256
 for i in range(256):
     INV_SBOX[SBOX[i]] = i
 
-# Round constant untuk key expansion AES-128 (round 1..10)
+# rcon buat key expansion
 RCON = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36]
 
 
-# Word = integer 32-bit, byte pertama ada di posisi paling kiri (big-endian)
 def rot_word(w: int) -> int:
-    """[a0 a1 a2 a3] -> [a1 a2 a3 a0]"""
     return ((w << 8) & 0xffffffff) | (w >> 24)
 
 
 def sub_word(w: int) -> int:
-    """SBOX diterapkan ke tiap byte dari word"""
     return (SBOX[(w >> 24) & 0xff] << 24 | SBOX[(w >> 16) & 0xff] << 16 |
             SBOX[(w >> 8) & 0xff] << 8 | SBOX[w & 0xff])
 
 
 def key_expansion(key: bytes) -> list:
-    """key 16 byte -> 44 word (11 round key, masing-masing 4 word)"""
+    # 16 byte key -> 44 word
     if len(key) != 16:
         raise ValueError("key AES-128 harus 16 byte")
     w = [int.from_bytes(key[4 * i:4 * i + 4], "big") for i in range(4)]
@@ -57,7 +54,7 @@ def key_expansion(key: bytes) -> list:
     return w
 
 
-# State 4x4 disusun per kolom: state[r][c] = block[r + 4*c]
+# state diisi per kolom, bukan per baris
 def bytes_to_state(block: bytes) -> list:
     return [[block[r + 4 * c] for c in range(4)] for r in range(4)]
 
@@ -71,12 +68,12 @@ def sub_bytes(state: list) -> list:
 
 
 def shift_rows(state: list) -> list:
-    """baris ke-r digeser ke kiri sebanyak r"""
+    # baris r geser kiri r kali
     return [state[r][r:] + state[r][:r] for r in range(4)]
 
 
 def xtime(a: int) -> int:
-    """kali 2 di GF(2^8): geser kiri, XOR 0x1b kalau bit ke-7 semula 1"""
+    # kali 2 di GF(2^8)
     a <<= 1
     if a & 0x100:
         a ^= 0x1b
@@ -84,7 +81,7 @@ def xtime(a: int) -> int:
 
 
 def mix_single_column(col: list) -> list:
-    """kolom dikali matriks [02 03 01 01] yang digeser per baris"""
+    # matriks 02 03 01 01
     a0, a1, a2, a3 = col
     return [
         xtime(a0) ^ (xtime(a1) ^ a1) ^ a2 ^ a3,
@@ -100,13 +97,11 @@ def mix_columns(state: list) -> list:
 
 
 def add_round_key(state: list, w: list, rnd: int) -> list:
-    """XOR state dengan round key ke-rnd (word w[4*rnd + c] = kolom c)"""
     return [[state[r][c] ^ ((w[4 * rnd + c] >> (24 - 8 * r)) & 0xff)
              for c in range(4)] for r in range(4)]
 
 
 def encrypt_block(block: bytes, w: list) -> bytes:
-    """enkripsi 1 blok 16 byte, w = hasil key_expansion"""
     state = add_round_key(bytes_to_state(block), w, 0)
     for rnd in range(1, 10):
         state = sub_bytes(state)
@@ -120,7 +115,6 @@ def encrypt_block(block: bytes, w: list) -> bytes:
 
 
 def gmul(a: int, b: int) -> int:
-    """perkalian a * b di GF(2^8) lewat xtime berulang"""
     p = 0
     while b:
         if b & 1:
@@ -131,7 +125,7 @@ def gmul(a: int, b: int) -> int:
 
 
 def inv_shift_rows(state: list) -> list:
-    """baris ke-r digeser ke kanan sebanyak r"""
+    # kebalikan shift_rows, geser kanan
     return [state[r][4 - r:] + state[r][:4 - r] for r in range(4)]
 
 
@@ -140,7 +134,7 @@ def inv_sub_bytes(state: list) -> list:
 
 
 def inv_mix_single_column(col: list) -> list:
-    """kolom dikali matriks [0e 0b 0d 09] yang digeser per baris"""
+    # matriks 0e 0b 0d 09
     a0, a1, a2, a3 = col
     return [
         gmul(a0, 0x0e) ^ gmul(a1, 0x0b) ^ gmul(a2, 0x0d) ^ gmul(a3, 0x09),
@@ -156,7 +150,6 @@ def inv_mix_columns(state: list) -> list:
 
 
 def decrypt_block(block: bytes, w: list) -> bytes:
-    """dekripsi 1 blok 16 byte, w = hasil key_expansion"""
     state = add_round_key(bytes_to_state(block), w, 10)
     for rnd in range(9, 0, -1):
         state = inv_shift_rows(state)
