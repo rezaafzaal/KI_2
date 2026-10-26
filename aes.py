@@ -57,6 +57,24 @@ def key_expansion(key: bytes) -> list:
     return w
 
 
+# State 4x4 disusun per kolom: state[r][c] = block[r + 4*c]
+def bytes_to_state(block: bytes) -> list:
+    return [[block[r + 4 * c] for c in range(4)] for r in range(4)]
+
+
+def state_to_bytes(state: list) -> bytes:
+    return bytes(state[r][c] for c in range(4) for r in range(4))
+
+
+def sub_bytes(state: list) -> list:
+    return [[SBOX[b] for b in row] for row in state]
+
+
+def shift_rows(state: list) -> list:
+    """baris ke-r digeser ke kiri sebanyak r"""
+    return [state[r][r:] + state[r][:r] for r in range(4)]
+
+
 def encrypt(plaintext: str, key: str) -> str:
     """plaintext ASCII + key ASCII 16 karakter -> ciphertext hex"""
     return plaintext.encode().hex()  # TODO: ganti dengan AES asli
