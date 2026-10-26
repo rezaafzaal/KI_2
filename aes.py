@@ -32,6 +32,31 @@ for i in range(256):
 RCON = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36]
 
 
+# Word = integer 32-bit, byte pertama ada di posisi paling kiri (big-endian)
+def rot_word(w: int) -> int:
+    """[a0 a1 a2 a3] -> [a1 a2 a3 a0]"""
+    return ((w << 8) & 0xffffffff) | (w >> 24)
+
+
+def sub_word(w: int) -> int:
+    """SBOX diterapkan ke tiap byte dari word"""
+    return (SBOX[(w >> 24) & 0xff] << 24 | SBOX[(w >> 16) & 0xff] << 16 |
+            SBOX[(w >> 8) & 0xff] << 8 | SBOX[w & 0xff])
+
+
+def key_expansion(key: bytes) -> list:
+    """key 16 byte -> 44 word (11 round key, masing-masing 4 word)"""
+    if len(key) != 16:
+        raise ValueError("key AES-128 harus 16 byte")
+    w = [int.from_bytes(key[4 * i:4 * i + 4], "big") for i in range(4)]
+    for i in range(4, 44):
+        temp = w[i - 1]
+        if i % 4 == 0:
+            temp = sub_word(rot_word(temp)) ^ (RCON[i // 4 - 1] << 24)
+        w.append(w[i - 4] ^ temp)
+    return w
+
+
 def encrypt(plaintext: str, key: str) -> str:
     """plaintext ASCII + key ASCII 16 karakter -> ciphertext hex"""
     return plaintext.encode().hex()  # TODO: ganti dengan AES asli
