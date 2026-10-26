@@ -75,6 +75,30 @@ def shift_rows(state: list) -> list:
     return [state[r][r:] + state[r][:r] for r in range(4)]
 
 
+def xtime(a: int) -> int:
+    """kali 2 di GF(2^8): geser kiri, XOR 0x1b kalau bit ke-7 semula 1"""
+    a <<= 1
+    if a & 0x100:
+        a ^= 0x1b
+    return a & 0xff
+
+
+def mix_single_column(col: list) -> list:
+    """kolom dikali matriks [02 03 01 01] yang digeser per baris"""
+    a0, a1, a2, a3 = col
+    return [
+        xtime(a0) ^ (xtime(a1) ^ a1) ^ a2 ^ a3,
+        a0 ^ xtime(a1) ^ (xtime(a2) ^ a2) ^ a3,
+        a0 ^ a1 ^ xtime(a2) ^ (xtime(a3) ^ a3),
+        (xtime(a0) ^ a0) ^ a1 ^ a2 ^ xtime(a3),
+    ]
+
+
+def mix_columns(state: list) -> list:
+    cols = [mix_single_column([state[r][c] for r in range(4)]) for c in range(4)]
+    return [[cols[c][r] for c in range(4)] for r in range(4)]
+
+
 def encrypt(plaintext: str, key: str) -> str:
     """plaintext ASCII + key ASCII 16 karakter -> ciphertext hex"""
     return plaintext.encode().hex()  # TODO: ganti dengan AES asli
